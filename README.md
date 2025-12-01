@@ -20,6 +20,8 @@ Per eseguire correttamente i playbook e gli script contenuti in questo progetto,
 
         - passlib: Libreria crittografica necessaria per la gestione delle password cifrate con Ansible Vault.
 
+---
+
 ## Struttura del Progetto
 
 Il progetto è organizzato in Ruoli Ansible per garantire modularità e riutilizzo del codice.
@@ -36,6 +38,7 @@ Il progetto è organizzato in Ruoli Ansible per garantire modularità e riutiliz
     └── jenkins_stack/       # Ruolo per il setup del server Jenkins containerizzato
 ```
 
+---
 
 # STEP 1 - Creare il Primo Playbook
 
@@ -50,6 +53,8 @@ Il primo passo fondamentale è stato la creazione di un'infrastruttura locale pe
     - Astrazione del Runtime: I task Ansible sono stati scritti per essere agnostici rispetto al container engine sottostante, supportando sia i moduli docker_image che podman_image.
 
     - Sicurezza del Registry: Per facilitare l'ambiente di laboratorio, il registry è configurato senza autenticazione TLS, accessibile via localhost.
+
+---
 
 # STEP 2 - Creare Build di container
 
@@ -68,6 +73,8 @@ Sono state create definizioni per due sistemi operativi distinti: Ubuntu e Alpin
     - Privilegi Sudo: Configurazione del file sudoers per permettere all'utente devops di elevare i propri privilegi quando necessario.
 
 Nota su Alpine Linux: Essendo estremamente minimale, ha richiesto passaggi aggiuntivi rispetto a Ubuntu. È stato necessario installare il pacchetto shadow per la gestione degli utenti e generare esplicitamente le host keys SSH (ssh-keygen -A) che, a differenza di Ubuntu, non vengono create automaticamente all'installazione del pacchetto openssh.
+
+---
 
 # STEP 3 - Creazione di un ruolo
 
@@ -119,6 +126,8 @@ Il flusso di lavoro automatizzato segue questi passaggi logici:
 
 Il ruolo container_runner è progettato per evitare conflitti. Poiché tutti i container espongono internamente la porta 22, il ruolo li mappa su porte host differenti e predefinite (es. 2201 per Ubuntu, 2202 per Alpine), rendendoli accessibili simultaneamente.
 
+---
+
 # STEP 4 - Vault
 
 L'introduzione di Ansible Vault ha permesso di elevare il livello di sicurezza del progetto, eliminando la pratica insicura di inserire password in chiaro nei file di configurazione o nei Dockerfile.
@@ -133,6 +142,7 @@ Per eseguire il playbook decifrando i segreti al volo:
 
 ansible-playbook --ask-vault-pass site.yml
 
+---
 
 # STEP 5 - Jenkins & Ansible
 
