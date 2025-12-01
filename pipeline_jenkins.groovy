@@ -16,20 +16,5 @@ pipeline {
                 }
             }
         }
-        stage('Deploy') {
-            steps {
-                script {
-                    sh "sudo docker pull ${REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER}"
-                    sh "sudo docker rm -f ${IMAGE_NAME}_run || true"
-                    sh """
-                        sudo docker run -d \
-                        --name ${IMAGE_NAME}_run \
-                        --restart always \
-                        -p ${DEPLOY_PORT}:80 \
-                        ${REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER}
-                    """
-                }
-            }
-        }
     }
 }
