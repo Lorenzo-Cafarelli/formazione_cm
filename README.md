@@ -24,6 +24,7 @@ Per eseguire correttamente i playbook e gli script contenuti in questo progetto,
 
 Il progetto è organizzato in Ruoli Ansible per garantire modularità e riutilizzo del codice.
 
+```text
 .
 ├── site.yml                 # Playbook principale di orchestrazione
 ├── secrets.yml              # File cifrato con Ansible Vault (credenziali)
@@ -33,6 +34,7 @@ Il progetto è organizzato in Ruoli Ansible per garantire modularità e riutiliz
     ├── image_builder/       # Ruolo per la Build e Push delle immagini (Ubuntu/Alpine)
     ├── container_runner/    # Ruolo per il Deployment dei container
     └── jenkins_stack/       # Ruolo per il setup del server Jenkins containerizzato
+```
 
 
 # STEP 1 - Creare il Primo Playbook
