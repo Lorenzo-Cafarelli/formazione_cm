@@ -1,6 +1,6 @@
 # Formazione CM - Track 3
 
-Il progetto integra tecnologie industry-standard come Ansible, Docker (con supporto sperimentale per Podman) e Jenkins. L'obiettivo finale è orchestrare l'intero ciclo di vita del software, dalla creazione di un'infrastruttura di registro locale fino al deployment continuo tramite pipeline CI/CD, simulando un ambiente di produzione reale su macchina locale.
+Il modulo ha l'obiettivo di fornire competenze pratiche per l'utilizzo di Ansible nella gestione di infrastrutture containerizzate con Docker e Podman. I partecipanti impareranno a creare e gestire playbook, configurare registri Docker, costruire e gestire container, creare ruoli Ansible, criptare password e file con Ansible Vault, e implementare pipeline di integrazione continua (CI) con Jenkins per il deploy e il build delle immagini.
 
 ## Prerequisiti
 
