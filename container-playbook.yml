@@ -1,0 +1,39 @@
+---
+- name: Setup Docker Registry locale (Command Method)
+  hosts: all
+  connection: local
+  gather_facts: no
+  
+  vars:
+    registry_port: 5000
+    registry_image: registry:2
+    container_name: local_registry
+
+  tasks:
+    # 1. Controlliamo manualmente se il container esiste già
+    - name: Verifica esistenza container
+      command: docker inspect {{ container_name }}
+      register: container_check
+      ignore_errors: true
+      changed_when: false # Non segnarlo come "cambiamento" nel report finale
+
+    # 2. Se il controllo sopra fallisce (rc != 0), avviamo il container
+    - name: Avvio del container Docker Registry
+      command: >
+        docker run -d
+        --restart always
+        --name {{ container_name }}
+        -p {{ registry_port }}:5000
+        {{ registry_image }}
+      when: container_check.rc != 0
+
+    # 3. Verifica che la porta stia rispondendo
+    - name: Attendi che il servizio sia pronto
+      wait_for:
+        port: "{{ registry_port }}"
+        delay: 2
+        timeout: 30
+
+    - name: Conferma successo
+      debug:
+        msg: "Registry attivo! Prova: docker tag alpine localhost:{{ registry_port }}/alpine-test"

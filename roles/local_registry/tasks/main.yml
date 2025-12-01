@@ -1,0 +1,19 @@
+---
+- name: Verifica stato del registry container
+  command: "{{ container_runtime }} ps -q -f name={{ registry_name }}"
+  register: registry_check
+  changed_when: false
+
+- name: Avvia il Local Registry
+  command: >
+    {{ container_runtime }} run -d 
+    -p {{ registry_port }}:5000 
+    --name {{ registry_name }} 
+    --restart always 
+    registry:2
+  when: registry_check.stdout == ""
+
+- name: Attendi che il registry sia pronto
+  wait_for:
+    port: "{{ registry_port }}"
+    delay: 2

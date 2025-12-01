@@ -1,0 +1,23 @@
+---
+- name: Pulizia container esistenti (se presenti)
+  command: "{{ container_runtime }} rm -f {{ item.name }}"
+  loop: "{{ deploy_containers }}"
+  ignore_errors: true
+  changed_when: false
+
+- name: Run dei Container dai Registry
+  command: >
+    {{ container_runtime }} run -d
+    --name {{ item.name }}
+    --restart always
+    -p {{ item.host_port }}:22
+    {{ tls_flag | default('') }}
+    {{ registry_host }}:{{ registry_port }}/{{ item.image_name }}:{{ item.image_tag }}
+  loop: "{{ deploy_containers }}"
+  vars:
+    tls_flag: "{{ '--tls-verify=false' if container_runtime == 'podman' else '' }}"
+
+- name: Info Accesso
+  debug:
+    msg: "Container {{ item.name }} accessibile via: ssh -i {{ ssh_key_path }} -p {{ item.host_port }} {{ lab_user }}@localhost"
+  loop: "{{ deploy_containers }}"

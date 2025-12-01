@@ -1,0 +1,122 @@
+---
+- name: Build e Deploy di Container SSH (Shell Method)
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    lab_user: "ansible_user"
+    key_path: "./lab_ssh_key"
+    
+    containers:
+      - name: "container_ubuntu"
+        os_type: "ubuntu"
+        image_tag: "my_ubuntu_ssh:latest"
+        host_port: 2022
+      - name: "container_alpine"
+        os_type: "alpine"
+        image_tag: "my_alpine_ssh:latest"
+        host_port: 2023
+
+  tasks:
+    # ---------------------------------------------------------
+    # FASE 1: Generazione Chiavi SSH per l'accesso
+    # ---------------------------------------------------------
+    - name: Genera coppia di chiavi SSH per il laboratorio
+      community.crypto.openssh_keypair:
+        path: "{{ key_path }}"
+        type: ed25519
+      register: ssh_key
+
+    # ---------------------------------------------------------
+    # FASE 2: Preparazione Context di Build (Cartelle e File)
+    # ---------------------------------------------------------
+    - name: Crea directory di build per ogni OS
+      file:
+        path: "./build_{{ item.os_type }}"
+        state: directory
+      loop: "{{ containers }}"
+
+    - name: Copia la chiave pubblica nelle directory di build
+      copy:
+        src: "{{ key_path }}.pub"
+        dest: "./build_{{ item.os_type }}/authorized_keys"
+      loop: "{{ containers }}"
+
+    # ---------------------------------------------------------
+    # FASE 3: Creazione dei Dockerfile
+    # ---------------------------------------------------------
+    
+    # DOCKERFILE PER UBUNTU
+    - name: Crea Dockerfile per Ubuntu
+      copy:
+        dest: "./build_ubuntu/Dockerfile"
+        content: |
+          FROM ubuntu:latest
+          # Installa SSH, Sudo e Python (per Ansible future)
+          RUN apt-get update && apt-get install -y openssh-server sudo python3
+          # Configura SSHD: crea directory necessaria
+          RUN mkdir /var/run/sshd
+          # Crea utente e configura sudo senza password
+          RUN useradd -m -s /bin/bash {{ lab_user }}
+          RUN echo '{{ lab_user }} ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/{{ lab_user }}
+          # Imposta chiavi SSH
+          RUN mkdir -p /home/{{ lab_user }}/.ssh
+          COPY authorized_keys /home/{{ lab_user }}/.ssh/authorized_keys
+          RUN chown -R {{ lab_user }}:{{ lab_user }} /home/{{ lab_user }}/.ssh && chmod 600 /home/{{ lab_user }}/.ssh/authorized_keys
+          # Espone porta ed avvia
+          EXPOSE 22
+          CMD ["/usr/sbin/sshd", "-D"]
+
+    # DOCKERFILE PER ALPINE (Richiede passaggi diversi per SSH)
+    - name: Crea Dockerfile per Alpine
+      copy:
+        dest: "./build_alpine/Dockerfile"
+        content: |
+          FROM alpine:latest
+          # Installa SSH, Sudo, Python e Shadow (per useradd standard)
+          RUN apk add --no-cache openssh sudo python3 shadow bash
+          # Genera host keys (CRUCIALE per Alpine, altrimenti sshd non parte)
+          RUN ssh-keygen -A
+          # Crea utente e configura sudo
+          RUN useradd -m -s /bin/bash {{ lab_user }}
+          RUN echo '{{ lab_user }} ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/{{ lab_user }}
+          # Imposta chiavi SSH
+          RUN mkdir -p /home/{{ lab_user }}/.ssh
+          COPY authorized_keys /home/{{ lab_user }}/.ssh/authorized_keys
+          RUN chown -R {{ lab_user }}:{{ lab_user }} /home/{{ lab_user }}/.ssh && chmod 600 /home/{{ lab_user }}/.ssh/authorized_keys
+          # Espone porta ed avvia
+          EXPOSE 22
+          CMD ["/usr/sbin/sshd", "-D"]
+
+    # ---------------------------------------------------------
+    # FASE 4: Build delle Immagini (Metodo Shell per Mac/Linux)
+    # ---------------------------------------------------------
+    - name: Build delle immagini Docker (Shell)
+      command: "docker build -t {{ item.image_tag }} ./build_{{ item.os_type }}"
+      loop: "{{ containers }}"
+      changed_when: true
+
+    # ---------------------------------------------------------
+    # FASE 5: Pulizia e Avvio
+    # ---------------------------------------------------------
+    - name: Rimuovi container vecchi se esistono
+      command: "docker rm -f {{ item.name }}"
+      loop: "{{ containers }}"
+      ignore_errors: true 
+      changed_when: false
+
+    - name: Avvio nuovi container
+      command: >
+        docker run -d
+        --name {{ item.name }}
+        --restart always
+        -p {{ item.host_port }}:22
+        {{ item.image_tag }}
+      loop: "{{ containers }}"
+
+    - name: Info finali per la connessione
+      debug:
+        msg: 
+          - "Setup completato!"
+          - "Per collegarti a Ubuntu: ssh -i {{ key_path }} -p 2022 {{ lab_user }}@localhost"
+          - "Per collegarti ad Alpine: ssh -i {{ key_path }} -p 2023 {{ lab_user }}@localhost"

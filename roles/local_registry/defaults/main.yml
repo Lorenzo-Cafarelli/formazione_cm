@@ -1,0 +1,4 @@
+---
+registry_name: "local_registry"
+registry_port: 5000
+container_runtime: "docker"

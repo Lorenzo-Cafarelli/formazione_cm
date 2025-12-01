@@ -1,0 +1,87 @@
+---
+- name: Crea directory artifacts (sicurezza)
+  file:
+    path: "./artifacts"
+    state: directory
+
+- name: Genera chiavi SSH per i container
+  community.crypto.openssh_keypair:
+    path: "{{ ssh_key_path }}"
+    type: ed25519
+  register: ssh_key_gen
+
+- name: Crea directory di build per le immagini
+  file:
+    path: "./artifacts/build_{{ item.name }}"
+    state: directory
+  loop: "{{ build_images }}"
+
+- name: Copia chiave pubblica nei contesti di build
+  copy:
+    src: "{{ ssh_key_path }}.pub"
+    dest: "./artifacts/build_{{ item.name }}/authorized_keys"
+  loop: "{{ build_images }}"
+
+# --- UBUNTU CON VAULT ---
+- name: Genera Dockerfile per Ubuntu (Vault Secured)
+  copy:
+    dest: "./artifacts/build_{{ item.name }}/Dockerfile"
+    content: |
+      FROM ubuntu:latest
+      RUN apt-get update && apt-get install -y openssh-server sudo python3
+      RUN mkdir /var/run/sshd
+      # UTENTE CON PASSWORD: Usa l'hash della password definita nel vault (con default di sicurezza)
+      RUN useradd -m -s /bin/bash -p '{{ vault_container_password | default("PasswordFallBack123!") | password_hash("sha512") }}' {{ lab_user }}
+      
+      # Sudo senza password (opzionale, ora che hai la password potresti toglierlo)
+      RUN echo '{{ lab_user }} ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/{{ lab_user }}
+      
+      # Setup SSH
+      RUN mkdir -p /home/{{ lab_user }}/.ssh
+      COPY authorized_keys /home/{{ lab_user }}/.ssh/authorized_keys
+      RUN chown -R {{ lab_user }}:{{ lab_user }} /home/{{ lab_user }}/.ssh && chmod 600 /home/{{ lab_user }}/.ssh/authorized_keys
+      EXPOSE 22
+      CMD ["/usr/sbin/sshd", "-D"]
+  loop: "{{ build_images }}"
+  when: item.os_type == 'ubuntu'
+
+# --- ALPINE CON VAULT ---
+- name: Genera Dockerfile per Alpine (Vault Secured)
+  copy:
+    dest: "./artifacts/build_{{ item.name }}/Dockerfile"
+    content: |
+      FROM alpine:latest
+      RUN apk add --no-cache openssh sudo python3 shadow bash
+      RUN ssh-keygen -A
+      # UTENTE CON PASSWORD: Usa l'hash della password definita nel vault (con default di sicurezza)
+      RUN useradd -m -s /bin/bash -p '{{ vault_container_password | default("PasswordFallBack123!") | password_hash("sha512") }}' {{ lab_user }}
+      
+      RUN echo '{{ lab_user }} ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/{{ lab_user }}
+      
+      # Setup SSH
+      RUN mkdir -p /home/{{ lab_user }}/.ssh
+      COPY authorized_keys /home/{{ lab_user }}/.ssh/authorized_keys
+      RUN chown -R {{ lab_user }}:{{ lab_user }} /home/{{ lab_user }}/.ssh && chmod 600 /home/{{ lab_user }}/.ssh/authorized_keys
+      EXPOSE 22
+      CMD ["/usr/sbin/sshd", "-D"]
+  loop: "{{ build_images }}"
+  when: item.os_type == 'alpine'
+
+# --- BUILD E PUSH ---
+- name: Build delle Immagini
+  command: >
+    {{ container_runtime }} build 
+    -t {{ registry_host }}:{{ registry_port }}/{{ item.name }}:{{ item.tag }} 
+    ./artifacts/build_{{ item.name }}
+  loop: "{{ build_images }}"
+  changed_when: true
+
+- name: Push sul Registry Locale
+  command: >
+    {{ container_runtime }} push 
+    {{ tls_flag | default('') }}
+    {{ registry_host }}:{{ registry_port }}/{{ item.name }}:{{ item.tag }}
+  loop: "{{ build_images }}"
+  vars:
+    tls_flag: "{{ '--tls-verify=false' if container_runtime == 'podman' else '' }}"
+  changed_when: true

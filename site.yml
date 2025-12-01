@@ -1,0 +1,47 @@
+---
+- name: Step 3 - Orchestrazione Container con Ruoli
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  
+  vars:
+    # --- CONFIGURAZIONE GLOBALE ---
+    # Scegli 'docker' o 'podman'
+    container_runtime: "docker" 
+    
+    # Parametri generali
+    lab_user: "devops"
+    ssh_key_path: "./artifacts/lab_key"
+    registry_host: "localhost"
+    registry_port: 5050
+
+    # Immagini da costruire
+    build_images:
+      - name: "custom_ubuntu"
+        os_type: "ubuntu"
+        tag: "v1"
+      - name: "custom_alpine"
+        os_type: "alpine"
+        tag: "v1"
+
+    # Container da lanciare
+    deploy_containers:
+      - name: "srv_ubuntu_01"
+        image_name: "custom_ubuntu"
+        image_tag: "v1"
+        host_port: 2201
+      - name: "srv_alpine_01"
+        image_name: "custom_alpine"
+        image_tag: "v1"
+        host_port: 2202
+
+  roles:
+    - role: local_registry
+      vars:
+        registry_name: "my_local_registry"
+    
+    - role: image_builder
+    
+    - role: container_runner
+
+    - role: jenkins_stack
